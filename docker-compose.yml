@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  webtoon:
+    build: .
+    container_name: webtoon_reader
+    ports:
+      - "6080:5000"
+    volumes:
+      # Webtoon library (READ-ONLY recommended)
+      - /mnt/media/bd/webtoons:/library:ro
+
+      # SQLite database persistence
+      - ./instance:/app/instance
+
+    restart: unless-stopped
+
+    environment:
+      - WEBTOON_LIBRARY=/library

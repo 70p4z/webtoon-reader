@@ -1,0 +1,34 @@
+
+{% extends "base.html" %}
+{% block breadcrumb %}
+<div class="breadcrumb">
+  <a class="nav-btn" href="{{ url_for('home') }}">◀</a>
+
+  <a href="{{ url_for('home') }}">Home</a>
+  <span class="sep">/</span>
+  <span>{{ title.name }}</span>
+
+  <form method="post"
+        action="{{ url_for('reset_title', title_id=title.id) }}"
+        onsubmit="return confirm('Reset all bookmarks for this title?')">
+    <button class="nav-btn">↺ Reset</button>
+  </form>
+
+  <button class="nav-btn" onclick="toggleTheme()">🌓</button>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="episodes">
+{% for e in episodes %}
+<a class="episode {% if e.completed %}read{% endif %}" href="{{ url_for('episode', episode_id=e.id) }}">
+{% if e.thumb %}<img src="{{ url_for('image', filename=e.thumb) }}">{% endif %}
+<div class="ep-info">
+  <div class="ep-num">Episode {{ e.number }}</div>
+  <div class="ep-name">{{ e.name }}</div>
+  {% if e.scroll and not e.completed %}<div class="resume">Resume</div>{% endif %}
+</div>
+</a>
+{% endfor %}
+</div>
+{% endblock %}

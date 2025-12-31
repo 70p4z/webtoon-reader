@@ -1,0 +1,16 @@
+
+{% extends "base.html" %}
+{% block breadcrumb %}
+<div class="breadcrumb">
+  <span>Home</span>
+  <a class="nav-btn" href="{{ url_for('scan') }}">⟳</a>
+  <button class="nav-btn" onclick="toggleTheme()">🌓</button>
+</div>
+{% endblock %}
+{% block content %}
+<div class="grid">
+{% for t in titles %}
+<a class="title" href="{{ url_for('title', title_id=t.id) }}">{{ t.name }}</a>
+{% endfor %}
+</div>
+{% endblock %}

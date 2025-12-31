@@ -1,0 +1,35 @@
+
+{% extends "base.html" %}
+{% block breadcrumb %}
+<div class="breadcrumb">
+  {% if prev_ep %}
+    <a class="nav-btn" href="{{ url_for('episode', episode_id=prev_ep.id) }}">◀</a>
+  {% else %}
+    <span class="nav-btn disabled">◀</span>
+  {% endif %}
+
+  <a href="{{ url_for('home') }}">Home</a>
+  <span class="sep">/</span>
+  <a href="{{ url_for('title', title_id=episode.title_id) }}">{{ episode.title_name }}</a>
+  <span class="sep">/</span>
+  <span>{{ episode.name }}</span>
+
+  {% if next_ep %}
+    <a class="nav-btn" href="{{ url_for('episode', episode_id=next_ep.id) }}">▶</a>
+  {% else %}
+    <span class="nav-btn disabled">▶</span>
+  {% endif %}
+
+  <button class="nav-btn" onclick="toggleTheme()">🌓</button>
+</div>
+{% endblock %}
+{% block content %}
+<div id="reader">
+{% for img in images %}
+<img src="{{ url_for('image', filename=img.path) }}" class="page">
+{% endfor %}
+</div>
+<script>
+initReader({{ episode.id }});
+</script>
+{% endblock %}
