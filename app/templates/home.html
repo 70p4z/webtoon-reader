@@ -1,0 +1,11 @@
+
+{% extends "base.html" %}
+{% block crumb %}{% endblock %}
+{% block content %}
+<h2>Titles</h2>
+<div class='cards'>
+{% for t in titles %}
+<a class='title-card' href='{{ url_for("title_view", tid=t.id) }}'>{{t.name}}</a>
+{% endfor %}
+</div>
+{% endblock %}

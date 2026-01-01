@@ -1,0 +1,35 @@
+
+{% extends "base.html" %}
+{% block crumb %}
+&gt; <a href='{{ url_for("title_view", tid=title.id)}}'>{{title.name}}</a> &gt; {{episode.name}}
+{% endblock %}
+{% block content %}
+<div id='reader' data-episode='{{episode.id}}'>
+{% for img in images %}
+<img class="panel"
+     loading="lazy"
+     src="{{ url_for('media', eid=episode.id, fname=img.filename) }}"
+     alt="">
+{% endfor %}
+</div>
+{% if next_ep %}
+<a class='episode-card' href='{{ url_for("episode", eid=next_ep.id)}}'>
+    {% if next_ep.thumb %}
+        <img class="episode-thumb"
+             src="{{ url_for('media', eid=next_ep.id, fname=next_ep.thumb) }}"
+             alt="thumb">
+    {% endif %}
+		<div class="episode-title">
+        Next episode {{ next_ep.number }}
+    </div>
+    <div class="episode-name">
+        {{ next_ep.name }}
+    </div>
+</a>
+{% endif %}
+<script>
+window.addEventListener('DOMContentLoaded', function(){
+  initReader({{scroll}});
+});
+</script>
+{% endblock %}

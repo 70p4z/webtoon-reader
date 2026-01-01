@@ -1,0 +1,36 @@
+
+{% extends "base.html" %}
+{% block crumb %}
+&gt; {{ title.name }}
+{% endblock %}
+{% block content %}
+<h2>{{title.name}}</h2>
+<div class='episodes'>
+{% for e in episodes %}
+<a class="episode-card
+{% if bookmarks.get(e.id) and bookmarks[e.id].scroll>0 %} resume {% endif %}
+" href="{{ url_for('episode', eid=e.id) }}">
+
+    {% if e.thumb %}
+        <img class="episode-thumb"
+             src="{{ url_for('media', eid=e.id, fname=e.thumb) }}"
+             alt="thumb">
+    {% endif %}
+
+    <div class="episode-info">
+        <div class="episode-title">
+            Episode {{ e.number }}
+        </div>
+        <div class="episode-name">
+            {{ e.name }}
+        </div>
+
+        {% if bookmarks.get(e.id) and bookmarks[e.id].scroll>0 %}
+            <!--<div class="resume-badge">Resume</div>-->
+        {% endif %}
+    </div>
+
+</a>
+{% endfor %}
+</div>
+{% endblock %}

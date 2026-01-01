@@ -1,0 +1,15 @@
+
+version: '3'
+services:
+  webtoon:
+    build: .
+    ports:
+      - "6080:5000"
+    environment:
+      - WEBTOON_LIBRARY=/data/library
+      - RESCAN_TOKEN=secrettoken123
+    volumes:
+      #- ./library:/data/library
+      - /mnt/media/bd/webtoons:/data/library:ro
+      - ./db/:/app/db/
+

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block crumb %}
+&gt; Manage Users
+{% endblock %}
+
+{% block content %}
+
+<h2 style="margin-top:70px;">Actions</h2>
+
+{% if current_user.is_authenticated and current_user.is_admin %}
+  <button class="scan-btn" onclick="startScan()">🔄 Rescan Library</button>
+{% endif %}
+
+<h2 style="margin-top:70px;">Manage Users</h2>
+
+<form method="post" style="margin:20px;">
+  <input name="username" placeholder="username" required>
+  <label>
+    <input type="checkbox" name="is_admin">
+    Admin
+  </label>
+  <button>Create</button>
+</form>
+
+{% if new_user %}
+<div style="padding:10px; border-radius:10px; background:#333; color:white;">
+  <strong>User Created:</strong> {{ new_user.username }}<br>
+  Registration link:<br>
+  <a style="color:#4af" href="{{ link }}">{{ link }}</a>
+</div>
+{% endif %}
+
+<h3>Existing Users</h3>
+
+<ul>
+{% for u in users %}
+  <li>
+    {{ u.username }}
+    {% if u.is_admin %}(admin){% endif %}
+
+    {% if u.register_token %}
+      — Register link:
+      <a href="{{ url_for('register', token=u.register_token, _external=True) }}">
+        {{ url_for('register', token=u.register_token, _external=True) }}
+      </a>
+    {% endif %}
+
+    {% if u.id != current_user.id %}
+      <form method="post" action="{{ url_for('delete_user', uid=u.id) }}" style="display:inline;">
+        <button style="background:#c62828; color:white;">Delete</button>
+      </form>
+    {% endif %}
+  </li>
+{% endfor %}
+</ul>
+
+{% endblock %}

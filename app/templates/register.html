@@ -1,0 +1,9 @@
+
+{% extends "base.html" %}
+{% block content %}
+<h2>Register {{ user.username }}</h2>
+<form method='post'>
+<input type='password' name='password'>
+<button>Set password</button>
+</form>
+{% endblock %}

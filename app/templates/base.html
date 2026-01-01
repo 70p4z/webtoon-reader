@@ -1,0 +1,36 @@
+
+<!doctype html>
+<html lang='en' data-theme='light'>
+<head>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Webtoon</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+</head>
+<body>
+<script>
+window.SCRIPT_ROOT = "{{ request.script_root|default('', true) }}";
+</script>
+<div class='breadcrumb'>
+  <a href='{{ url_for("home") }}'>Home</a>
+  {% block crumb %}{% endblock %}
+	<div id='scan-status'></div>
+
+	<button onclick='toggleTheme()'>🌓</button>
+  {% if current_user.is_admin %}
+    <a href="{{ url_for('add_user_page') }}" class="admin-btn">
+      👤 Admin
+    </a>
+  {% endif %}
+	{% if current_user.is_authenticated %}
+	  <a href="{{ url_for('logout') }}" class="logout-btn">⏻ Logout</a>
+	{% endif %}
+</div>
+{% with messages = get_flashed_messages() %}
+{% if messages %}
+<div class='flash'>{{ messages[0] }}</div>
+{% endif %}
+{% endwith %}
+{% block content %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,23 @@
+
+{% extends "base.html" %}
+{% block content %}
+<h2>Login</h2>
+<form method='post'>
+<input name='username' placeholder='username'>
+<input name='password' type='password'>
+<button>Login</button>
+</form>
+{% if pending and pending.is_admin %}
+<div style="margin-top:20px;padding:10px;border-radius:10px;background:#333;color:white">
+  <strong>Admin setup required</strong><br>
+
+  {% if pending.register_token %}
+      Use this link to register the admin account:<br>
+      <a style="color:#4af"
+         href="{{ url_for('register', token=pending.register_token) }}">
+         {{ request.url_root }}register/{{ pending.register_token }}
+      </a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}
