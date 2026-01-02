@@ -292,7 +292,15 @@ def prefs():
 @app.route("/list")
 @login_required
 def home():
-    titles = Title.query.all()
+    #titles = Title.query.all()
+    titles = (
+        db.session.query(Title)
+        .join(Episode)
+        .join(EpisodeImage)
+        .distinct()
+        .order_by(Title.name)
+        .all()
+    )
     return render_template("home.html", titles=titles)
 
 @app.route("/title/<int:tid>")
