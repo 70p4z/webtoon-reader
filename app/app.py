@@ -110,59 +110,118 @@ def ensure_admin_if_none():
 ########### SCANNER ###########
 def scan_library():
     with app.app_context():
+        global scan_status
+
+        scan_status.update({
+            "running": True,
+            "progress": 0,
+            "message": "Starting scan",
+            "done": 0,
+            "total": 0
+        })
+
+        if not os.path.isdir(LIBRARY_ROOT):
+            scan_status.update({
+                "running": False,
+                "message": "Library not found"
+            })
+            return
+
+        # -------- TITLES --------
         try:
-            global scan_status
-            scan_status.update({"running": True, "progress":0, "message":"Starting", "done":0, "total":0})
-            titles = []
-            for root, dirs, files in os.walk(LIBRARY_ROOT):
-                pass
-            # titles = dirs directly under LIBRARY_ROOT
-            if not os.path.exists(LIBRARY_ROOT):
-                scan_status["running"]=False
-                return
-            titles = sorted(next(os.walk(LIBRARY_ROOT))[1])
+            title_names = sorted(
+                d for d in os.listdir(LIBRARY_ROOT)
+                if os.path.isdir(os.path.join(LIBRARY_ROOT, d))
+            )
+        except OSError as e:
+            app.logger.error(f"Failed to list library: {e}")
+            scan_status["running"] = False
+            return
 
-            scan_status["total"] = len(titles)
-            done = 0
-            for t in titles:
-                scan_status["message"] = f"Indexing {t}"
-                tpath = os.path.join(LIBRARY_ROOT, t)
-                title = Title.query.filter_by(name=t).first()
-                if not title:
-                    title = Title(name=t, path=tpath)
-                    db.session.add(title)
+        scan_status["total"] = len(title_names)
+
+        for title_idx, title_name in enumerate(title_names, start=1):
+            scan_status["message"] = f"Indexing title: {title_name}"
+            scan_status["done"] = title_idx
+            scan_status["progress"] = int(title_idx / max(1, len(title_names)+1) * 100)
+
+            title_path = os.path.abspath(os.path.join(LIBRARY_ROOT, title_name))
+
+            title = Title.query.filter_by(name=title_name).first()
+            if not title:
+                title = Title(name=title_name, path=title_path)
+                db.session.add(title)
+                db.session.commit()
+
+            # -------- EPISODES --------
+            try:
+                episode_names = sorted(
+                    d for d in os.listdir(title_path)
+                    if os.path.isdir(os.path.join(title_path, d))
+                )
+            except OSError as e:
+                app.logger.warning(f"Cannot read episodes in {title_name}: {e}")
+                continue
+
+            episode_names.sort(key=smart_extract_number)
+
+            for episode_name in episode_names:
+                episode_path = os.path.abspath(os.path.join(title_path, episode_name))
+                ep_number = smart_extract_number(episode_name)
+
+                episode = Episode.query.filter_by(
+                    title_id=title.id,
+                    name=episode_name
+                ).first()
+
+                if not episode:
+                    episode = Episode(
+                        title_id=title.id,
+                        name=episode_name,
+                        number=ep_number,
+                        path=episode_path
+                    )
+                    db.session.add(episode)
                     db.session.commit()
 
-                episodes = sorted(next(os.walk(tpath))[1], key=lambda x: smart_extract_number(x))
+                # -------- IMAGES --------
+                try:
+                    image_files = [
+                        f for f in os.listdir(episode_path)
+                        if f.lower().endswith((".jpg", ".jpeg", ".png", ".webp"))
+                        and os.path.isfile(os.path.join(episode_path, f))
+                    ]
+                except OSError as e:
+                    app.logger.warning(
+                        f"Cannot read images in {episode_path}: {e}"
+                    )
+                    continue
 
-                for e in episodes:
-                    scan_status["message"] = f"Indexing {t}/{e}"
-                    epath = os.path.join(tpath, e)
-                    epi = Episode.query.filter_by(title_id=title.id, name=e).first()
-                    if not epi:
-                        epi = Episode(title_id=title.id, name=e, number=smart_extract_number(e), path=epath)
-                        db.session.add(epi)
-                        db.session.commit()
+                image_files.sort()
 
-                    # images
-                    imgs = [f for f in os.listdir(epath) if f.lower().endswith((".jpg",".jpeg",".png",".webp"))]
-                    imgs = sorted(imgs)
-                    EpisodeImage.query.filter_by(episode_id=epi.id).delete()
-                    db.session.commit()
-                    for idx, img in enumerate(imgs):
-                        db.session.add(EpisodeImage(episode_id=epi.id, filename=img, index=idx))
-                    if imgs:
-                        epi.thumb = imgs[0]
-                    db.session.commit()
-                    time.sleep(0.01)
+                # reset images for episode
+                EpisodeImage.query.filter_by(
+                    episode_id=episode.id
+                ).delete()
 
-                done += 1
-                scan_status["done"] = done
-                scan_status["progress"] = int(done/ max(len(titles),1) * 100)
-        except:
-            traceback.print_exc()
-        scan_status["running"] = False
-        scan_status["message"]="Done"
+                for idx, filename in enumerate(image_files):
+                    db.session.add(
+                        EpisodeImage(
+                            episode_id=episode.id,
+                            filename=filename,
+                            index=idx
+                        )
+                    )
+                if image_files:
+                    episode.thumb = image_files[0]
+                db.session.commit()
+        # -------- FINISH --------
+        scan_status.update({
+            "running": False,
+            "message": "Scan complete",
+            "progress": 100
+        })
+        app.logger.info("Library scan completed successfully")
 
 def start_scan_background():
     if not scan_status["running"]:
