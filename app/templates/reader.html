@@ -15,11 +15,11 @@
 {% if next_ep %}
 <a class='episode-card' href='{{ url_for("episode", eid=next_ep.id)}}'>
     {% if next_ep.thumb %}
-        <img class="episode-thumb"
+    <img class="episode-thumb"
              src="{{ url_for('media', eid=next_ep.id, fname=next_ep.thumb) }}"
              alt="thumb">
     {% endif %}
-		<div class="episode-title">
+    <div class="episode-title">
         Next episode {{ next_ep.number }}
     </div>
     <div class="episode-name">
@@ -28,8 +28,10 @@
 </a>
 {% endif %}
 <script>
-window.addEventListener('DOMContentLoaded', function(){
-  initReader({{scroll}});
+window.addEventListener("DOMContentLoaded", function(){
+  initReader({{ scroll or 0 }});
 });
 </script>
 {% endblock %}
+
+

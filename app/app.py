@@ -322,17 +322,24 @@ def episode(eid):
 @login_required
 def progress():
     eid = int(request.form["episode"])
-    scroll = int(float(request.form["scroll"]))
-    ue = UserEpisode.query.filter_by(user_id=current_user.id, episode_id=eid).first()
+    img_index = int(request.form["index"])
+
+    ue = UserEpisode.query.filter_by(
+        user_id=current_user.id,
+        episode_id=eid
+    ).first()
+
     if not ue:
         ue = UserEpisode(user_id=current_user.id, episode_id=eid)
         db.session.add(ue)
-    ue.scroll = scroll
-    # arbitrary threshold for read
-    ue.read = scroll > 3000
+
+    ue.scroll = img_index          # now means image index
+    ue.read = img_index > 0        # “started reading”
     ue.updated = datetime.utcnow()
+
     db.session.commit()
     return "ok"
+
 
 from flask import send_file
 

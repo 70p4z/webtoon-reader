@@ -53,88 +53,74 @@ function pollScan(){
     });
 }
 
-function initReader(scroll){
-  console.log("initReader started, restoring to nearest panel =", scroll);
+/* =========================
+   SCROLLING + RESUME
+========================= */
+function initReader(savedIndex){
+  console.log("initReader: resume image index =", savedIndex);
 
-  const header = document.querySelector('.breadcrumb');
+  const reader = document.getElementById("reader");
+  const panels = Array.from(reader.querySelectorAll(".panel"));
+  const header = document.querySelector(".breadcrumb");
   const offset = header ? header.offsetHeight + 6 : 0;
 
-  const panels = Array.from(document.querySelectorAll(".panel"));
-  if(!panels.length){
-    window.scrollTo(0,0);
-    return;
+  if (!panels.length) return;
+
+  /* ---------- RESUME ---------- */
+  function resume(){
+    const idx = Math.max(0, Math.min(savedIndex || 0, panels.length - 1));
+    const target = panels[idx];
+    const y = Math.max(target.offsetTop - offset, 0);
+    window.scrollTo({ top: y, behavior: "auto" });
   }
 
-  function findNearestPanel(targetScroll){
-    let nearest = panels[0];
-    let bestDist = Math.abs(nearest.offsetTop - targetScroll);
+  // run multiple times to survive image loading/layout shifts
+  resume();
+  setTimeout(resume, 100);
+  setTimeout(resume, 250);
+  window.addEventListener("load", resume);
 
-    panels.forEach(p => {
-      const d = Math.abs(p.offsetTop - targetScroll);
-      if(d < bestDist){
-        bestDist = d;
-        nearest = p;
-      }
-    });
-
-    return nearest;
-  }
-
-  function restore(){
-    const targetScroll = scroll || 0;
-    const nearest = findNearestPanel(targetScroll);
-
-    const y = Math.max(nearest.offsetTop - offset, 0);
-    console.log("Resuming at panel:", nearest, "y=", y);
-
-    window.scrollTo({
-      top: y,
-      behavior: "auto"
-    });
-  }
-
-  // Try multiple times because images may change layout
-  restore();
-  setTimeout(restore, 80);
-  setTimeout(restore, 180);
-  window.addEventListener("load", restore);
-  
-
-  /* -------- Progress Saving -------- */
+  /* ---------- PROGRESS TRACKING ---------- */
   let lastSent = -1;
-  let saveTimer = null;
+
+  function currentPanelIndex(){
+    const y = window.scrollY + offset + 10;
+
+    for (let i = panels.length - 1; i >= 0; i--) {
+      if (panels[i].offsetTop <= y) return i;
+    }
+    return 0;
+  }
 
   function sendProgress(){
-    const ep = document.getElementById('reader').dataset.episode;
-    const y = Math.round(window.scrollY);
-    if(y === lastSent) return;
-    lastSent = y;
+    const idx = currentPanelIndex();
+    if (idx === lastSent) return;
+    lastSent = idx;
 
-    fetch('/progress', {
-      method:'POST',
-      credentials:'include',
-      keepalive:true,
-      headers:{'Content-Type':'application/x-www-form-urlencoded'},
-      body:`episode=${ep}&scroll=${y}`
+    fetch("/progress", {
+      method: "POST",
+      credentials: "include",
+      keepalive: true,
+      headers: {"Content-Type":"application/x-www-form-urlencoded"},
+      body: `episode=${reader.dataset.episode}&index=${idx}`
     }).catch(()=>{});
   }
 
-  window.addEventListener('scroll', ()=>{
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(sendProgress, 300);
+  let timer = null;
+  window.addEventListener("scroll", ()=>{
+    clearTimeout(timer);
+    timer = setTimeout(sendProgress, 300);
+  });
+
+  document.addEventListener("visibilitychange", ()=>{
+    if (document.visibilityState === "hidden") sendProgress();
   });
 
   window.addEventListener("beforeunload", sendProgress);
-  document.addEventListener("visibilitychange", ()=>{
-    if(document.visibilityState === "hidden"){
-      sendProgress();
-    }
-  });
 
-  /* -------- Click Scroll Half-Screen -------- */
-  document.body.addEventListener('click', (e)=>{
-    let half = window.innerHeight/2;
-    if(e.clientY < half) window.scrollBy(0,-half);
-    else window.scrollBy(0,half);
+  /* ---------- CLICK HALF-SCREEN SCROLL ---------- */
+  document.body.addEventListener("click", (e)=>{
+    const half = window.innerHeight / 2;
+    window.scrollBy(0, e.clientY < half ? -half : half);
   });
 }
