@@ -9,7 +9,11 @@
 <h2 style="margin-top:70px;">Actions</h2>
 
 {% if current_user.is_authenticated and current_user.is_admin %}
-  <button class="scan-btn" onclick="startScan()">🔄 Rescan Library</button>
+  <button class="scan-btn" onclick="startScanFast()">🔄 Fast Library Scan</button>
+{% endif %}
+
+{% if current_user.is_authenticated and current_user.is_admin %}
+  <button class="scan-btn" onclick="startScanDeep()">🔄 Deep Library Scan</button>
 {% endif %}
 
 <h2 style="margin-top:70px;">Manage Users</h2>

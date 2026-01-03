@@ -30,8 +30,14 @@ document.addEventListener('DOMContentLoaded', () => {
 /* =========================
    SCAN STATUS + TRIGGER
 ========================= */
-function startScan(){
+function startScanFast(){
   fetch('/scan/start')
+    .then(r => r.json())
+    .then(() => pollScan())
+    .catch(() => alert("Scan failed"));
+}
+function startScanDeep(){
+  fetch('/scan/force')
     .then(r => r.json())
     .then(() => pollScan())
     .catch(() => alert("Scan failed"));
