@@ -13,12 +13,17 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.exc import IntegrityError
+from io import BytesIO
+import mimetypes
+import zipfile
+import rarfile
+
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "supersecret")
 
-logging.basicConfig(level=logging.ERROR)
-logging.getLogger('werkzeug').setLevel(logging.ERROR)
+logging.basicConfig(level=logging.INFO)
+logging.getLogger('werkzeug').setLevel(logging.INFO)
 
 DB_PATH = os.path.join(os.getcwd(), "db/webtoon.db")
 #if not os.path.exists(DB_PATH):
@@ -63,11 +68,13 @@ class User(db.Model, UserMixin):
     password_hash = db.Column(db.String(255), nullable=True)
     is_admin = db.Column(db.Boolean, default=False)
     register_token = db.Column(db.String(255), nullable=True)
+    enabled = db.Column(db.Boolean, default=True)
 
 class Title(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), unique=True)
     path = db.Column(db.String(1024))
+    available = db.Column(db.Boolean, default=True)
 
 class Episode(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -76,12 +83,16 @@ class Episode(db.Model):
     number = db.Column(db.Integer)
     path = db.Column(db.String(1024))
     thumb = db.Column(db.String(1024), nullable=True)
+    kind = db.Column(db.String(8), default="dir")   # dir | cbz | cbr
+    archive_path = db.Column(db.Text, nullable=True)
+    available = db.Column(db.Boolean, default=True)
 
 class EpisodeImage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     episode_id = db.Column(db.Integer, db.ForeignKey('episode.id'))
     filename = db.Column(db.String(1024))
     index = db.Column(db.Integer)
+    available = db.Column(db.Boolean, default=True)
 
 class UserEpisode(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -106,12 +117,92 @@ def ensure_admin_if_none():
         admin = User(username="admin", is_admin=True, register_token=token)
         db.session.add(admin)
         db.session.commit()
+
+IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp")
+
+def is_image(name):
+    return name.lower().endswith(IMAGE_EXTS)
+
+def image_mimetype(filename):
+    return mimetypes.guess_type(filename)[0] or "image/*"
+
+def list_cbz_images(path):
+    try:
+        with zipfile.ZipFile(path) as z:
+            return sorted(
+                n for n in z.namelist()
+                if not n.endswith("/") and is_image(n)
+            )
+    except Exception as e:
+        app.logger.warning(f"CBZ read failed: {path} ({e})")
+        return []
+
+def stream_cbz_image(cbz_path, inner_name):
+    def generate():
+        with zipfile.ZipFile(cbz_path) as z:
+            with z.open(inner_name) as f:
+                while True:
+                    chunk = f.read(64 * 1024)
+                    if not chunk:
+                        break
+                    yield chunk
+    return Response(
+        generate(),
+        mimetype=image_mimetype(inner_name)
+    )
+
+def list_cbr_images(path):
+    try:
+        with rarfile.RarFile(path) as r:
+            return sorted(
+                n for n in r.namelist()
+                if not n.endswith("/") and is_image(n)
+            )
+    except Exception as e:
+        app.logger.warning(f"CBR read failed: {path} ({e})")
+        return []
+
+from flask import Response
+
+def stream_cbr_image(cbr_path, inner_name):
+    def generate():
+        with rarfile.RarFile(cbr_path) as r:
+            with r.open(inner_name) as f:
+                while True:
+                    chunk = f.read(64 * 1024)  # 64 KB
+                    if not chunk:
+                        break
+                    yield chunk
+    return Response(
+        generate(),
+        mimetype=image_mimetype(inner_name)
+    )
+
+def detect_archive_format(path):
+    # returns "zip", "rar", or None
+    try:
+        if zipfile.is_zipfile(path):
+            return "zip"
+    except Exception:
+        traceback.print_exc()
+        pass
+
+    try:
+        import rarfile
+        if rarfile.is_rarfile(path):
+            return "rar"
+    except Exception:
+        traceback.print_exc()
+        pass
+
+    return None
+
 ########### SCANNER ###########
 def scan_library(mode="regular"):
     """
     mode:
-      - 'regular'  : only new titles + new episodes
-      - 'thorough' : full reindex (images rebuilt)
+      - regular  : only new titles + new episodes
+      - thorough : rebuild images for everything
     """
     with app.app_context():
         global scan_status
@@ -120,105 +211,125 @@ def scan_library(mode="regular"):
             "running": True,
             "progress": 0,
             "message": f"Starting {mode} scan",
-            "done": 0,
-            "total": 0
         })
 
         if not os.path.isdir(LIBRARY_ROOT):
-            scan_status.update({
-                "running": False,
-                "message": "Library not found"
-            })
+            scan_status.update({"running": False, "message": "Library missing"})
             return
 
-        # -------- TITLES --------
-        title_dirs = sorted(
+        titles = sorted(
             d for d in os.listdir(LIBRARY_ROOT)
             if os.path.isdir(os.path.join(LIBRARY_ROOT, d))
         )
 
-        scan_status["total"] = len(title_dirs)
+        total = len(titles)
 
-        for idx, title_name in enumerate(title_dirs, start=1):
-            scan_status["message"] = f"Scanning title: {title_name}"
-            scan_status["done"] = idx
-            scan_status["progress"] = int(idx / max(1, len(title_dirs)) * 100)
+        for ti, title_name in enumerate(titles, 1):
+            scan_status.update({
+                "progress": int(ti / max(1, total) * 100),
+                "message": f"{title_name}"
+            })
 
             title_path = os.path.abspath(os.path.join(LIBRARY_ROOT, title_name))
-
             title = Title.query.filter_by(name=title_name).first()
+
             if not title:
                 title = Title(name=title_name, path=title_path)
                 db.session.add(title)
                 db.session.commit()
 
-            # -------- EPISODES --------
-            episode_dirs = sorted(
-                d for d in os.listdir(title_path)
+            entries = os.listdir(title_path)
+
+            # ---------- DIRECTORY EPISODES ----------
+            episode_dirs = [
+                d for d in entries
                 if os.path.isdir(os.path.join(title_path, d))
-            )
-            episode_dirs.sort(key=smart_extract_number)
+            ]
 
-            for ep_name in episode_dirs:
-                ep_path = os.path.abspath(os.path.join(title_path, ep_name))
-                ep_number = smart_extract_number(ep_name)
+            # ---------- ARCHIVE EPISODES ----------
+            cbz_files = [f for f in entries if f.lower().endswith((".cbz", ".cbr")) and detect_archive_format(os.path.join(title_path, f)) == "zip"]
+            cbr_files = [f for f in entries if f.lower().endswith((".cbz", ".cbr")) and detect_archive_format(os.path.join(title_path, f)) == "rar"]
 
-                episode = Episode.query.filter_by(
+            # unify all episodes
+            all_eps = []
+
+            for d in episode_dirs:
+                app.logger.info(f"dir: {os.path.join(title_path, d)}")
+                all_eps.append(("dir", d, os.path.join(title_path, d)))
+
+            for f in cbz_files:
+                app.logger.info(f"cbz: {os.path.join(title_path, f)}")
+                all_eps.append(("cbz", f, os.path.join(title_path, f)))
+
+            for f in cbr_files:
+                app.logger.info(f"cbr: {os.path.join(title_path, f)}")
+                all_eps.append(("cbr", f, os.path.join(title_path, f)))
+
+            # order by episode number
+            all_eps.sort(key=lambda e: smart_extract_number(e[1]))
+
+            for kind, name, path in all_eps:
+                ep = Episode.query.filter_by(
                     title_id=title.id,
-                    name=ep_name
+                    name=name
                 ).first()
 
-                # ---- REGULAR SCAN ----
-                if episode and mode == "regular":
-                    continue   # nothing else to do
-
-                if not episode:
-                    episode = Episode(
-                        title_id=title.id,
-                        name=ep_name,
-                        number=ep_number,
-                        path=ep_path
-                    )
-                    db.session.add(episode)
-                    db.session.commit()
-
-                # ---- IMAGE SCAN ----
-                if mode == "regular":
-                    continue  # images untouched
-
-                # thorough scan rebuilds images
-                try:
-                    image_files = sorted(
-                        f for f in os.listdir(ep_path)
-                        if f.lower().endswith((".jpg", ".jpeg", ".png", ".webp"))
-                        and os.path.isfile(os.path.join(ep_path, f))
-                    )
-                except OSError:
+                # regular scan skips existing episodes
+                if ep and mode == "regular":
                     continue
 
-                EpisodeImage.query.filter_by(
-                    episode_id=episode.id
-                ).delete()
+                if not ep:
+                    ep = Episode(
+                        title_id=title.id,
+                        name=name,
+                        number=smart_extract_number(name),
+                        kind=kind,
+                        path=path if kind == "dir" else None,
+                        archive_path=path if kind != "dir" else None
+                    )
+                    db.session.add(ep)
+                    db.session.commit()
 
-                for i, fname in enumerate(image_files):
+                # ---------- IMAGE INDEXING ----------
+                if kind == "dir":
+                    app.logger.info(f"dir indexing: {path}")
+                    images = sorted(
+                        f for f in os.listdir(path)
+                        if is_image(f) and os.path.isfile(os.path.join(path, f))
+                    )
+
+                elif kind == "cbz":
+                    app.logger.info(f"cbz indexing: {path}")
+                    images = list_cbz_images(path)
+
+                elif kind == "cbr":
+                    app.logger.info(f"cbr indexing: {path}")
+                    images = list_cbr_images(path)
+
+                else:
+                    images = []
+
+                EpisodeImage.query.filter_by(episode_id=ep.id).delete()
+
+                for idx, img in enumerate(images):
                     db.session.add(
                         EpisodeImage(
-                            episode_id=episode.id,
-                            filename=fname,
-                            index=i
+                            episode_id=ep.id,
+                            filename=img,
+                            index=idx
                         )
                     )
 
-                episode.thumb = image_files[0] if image_files else None
+                ep.thumb = images[0] if images else None
                 db.session.commit()
 
         scan_status.update({
             "running": False,
-            "message": f"{mode.capitalize()} scan complete",
-            "progress": 100
+            "progress": 100,
+            "message": f"{mode.capitalize()} scan complete"
         })
 
-        app.logger.info(f"{mode.capitalize()} library scan finished")
+        app.logger.info(f"{mode} scan finished")
 
 
 
@@ -418,19 +529,34 @@ from flask import send_file
 @app.route("/media/<int:eid>/<path:fname>")
 @login_required
 def media(eid, fname):
-    ep = Episode.query.get_or_404(eid)
-    title = db.session.get(Title, ep.title_id)
-    # Prefer episode.path if exists
-    if ep.path:
-        base = ep.path
-    else:
-        # fallback safe absolute build
-        base = os.path.join(LIBRARY_ROOT, title.name, ep.name)
-    image_path = os.path.join(base, fname)
-    image_path = os.path.abspath(image_path)
-    if not os.path.exists(image_path):
-        return f"Image not found: {image_path}", 404
-    return send_file(image_path)
+    ep = db.session.get(Episode, eid)
+    if not ep:
+        abort(404)
+
+    # ---------- DIRECTORY EPISODE ----------
+    if ep.kind == "dir":
+        image_path = os.path.join(ep.path, fname)
+        image_path = os.path.abspath(image_path)
+
+        if not image_path.startswith(ep.path) or not os.path.isfile(image_path):
+            abort(404)
+
+        return send_file(image_path)
+
+    # ---------- CBZ EPISODE ----------
+    if ep.kind == "cbz":
+        if not ep.archive_path or not os.path.isfile(ep.archive_path):
+            abort(404)
+        return stream_cbz_image(ep.archive_path, fname)
+
+    # ---------- CBR EPISODE ----------
+    if ep.kind == "cbr":
+        if not ep.archive_path or not os.path.isfile(ep.archive_path):
+            abort(404)
+        return stream_cbr_image(ep.archive_path, fname)
+
+    abort(404)
+
 
 @app.route("/scan/start")
 @login_required
