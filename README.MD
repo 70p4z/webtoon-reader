@@ -1,5 +1,5 @@
 
-# 📖 Webtoon Reader (Flask)
+# 📖 Vibe Coded Webtoon Reader (Flask)
 
 A **self-hosted, multi-user webtoon / comic reader** built with **Python + Flask**, designed for **local libraries**, **CBZ/CBR archives**, and **mobile-first reading**.
 
