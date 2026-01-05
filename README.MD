@@ -12,6 +12,19 @@ This project focuses on:
 
 ---
 
+## Current UX 
+
+### Episodes for a title
+![episodes](sample/episodes.png?raw=true "Episodes")
+
+### Vertical scrolling an episode
+![reader](sample/reader.png?raw=true "Reader")
+
+### Admin view (manage user, run manual scans)
+![admin](sample/admin.png?raw=true "Admin")
+
+---
+
 ## ✨ Features
 
 ### 📚 Library & Content
