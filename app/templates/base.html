@@ -16,7 +16,14 @@ window.SCRIPT_ROOT = "{{ request.script_root|default('', true) }}";
   {% block crumb %}{% endblock %}
 	<div id='scan-status'></div>
 
+  <button id="order-toggle"
+          class="breadcrumb-btn"
+          title="Toggle episode order">
+    ⬇️
+  </button>
+
 	<button onclick='toggleTheme()'>🌓</button>
+
   {% if current_user.is_admin %}
     <a href="{{ url_for('add_user_page') }}" class="admin-btn">
       👤 Admin

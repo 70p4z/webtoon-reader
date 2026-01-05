@@ -22,8 +22,8 @@ import rarfile
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "supersecret")
 
-logging.basicConfig(level=logging.INFO)
-logging.getLogger('werkzeug').setLevel(logging.INFO)
+logging.basicConfig(level=logging.ERROR)
+logging.getLogger('werkzeug').setLevel(logging.ERROR)
 
 DB_PATH = os.path.join(os.getcwd(), "db/webtoon.db")
 #if not os.path.exists(DB_PATH):

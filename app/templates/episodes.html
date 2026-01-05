@@ -5,11 +5,11 @@
 {% endblock %}
 {% block content %}
 <h2>{{title.name}}</h2>
-<div class='episodes'>
+<div class='episodes' id="episode-list">
 {% for e in episodes %}
 <a class="episode-card
 {% if bookmarks.get(e.id) and bookmarks[e.id].scroll>0 %} resume {% endif %}
-" href="{{ url_for('episode', eid=e.id) }}">
+" href="{{ url_for('episode', eid=e.id) }}" data-ep-number="{{ e.number }}">
 
     {% if e.thumb %}
         <img class="episode-thumb"

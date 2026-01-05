@@ -15,17 +15,59 @@
    THEME TOGGLE
 ========================= */
 function toggleTheme(){
-  let t = localStorage.getItem('theme') === 'dark' ? 'light' : 'dark';
+  let t = localStorage.getItem('theme') === 'light' ? 'dark' : 'light';
   localStorage.setItem('theme', t);
   document.documentElement.dataset.theme = t;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  let t = localStorage.getItem('theme') || 'dark';
+  let t = localStorage.getItem('theme') || 'light';
+  localStorage.setItem('theme', t);
   document.documentElement.dataset.theme = t;
   pollScan();
+
+  let o = localStorage.getItem('episodeOrder') || 'desc';
+  localStorage.setItem('episodeOrder', o);
 });
 
+function applyEpisodeOrder(){
+  const list = document.getElementById("episode-list");
+  
+  if (!list) return;
+
+  const order = localStorage.getItem("episodeOrder") || "asc";
+
+  const cards = Array.from(document.getElementsByClassName("episode-card"));
+
+  cards.sort((a, b) => {
+    const na = parseInt(a.dataset.epNumber || 0);
+    const nb = parseInt(b.dataset.epNumber || 0);
+    return order === "desc" ? nb - na : na - nb;
+  });
+
+  // regen the list
+  list.innerHTML = "";
+  cards.forEach(c => list.appendChild(c));
+
+  const btn = document.getElementById("order-toggle");
+  if (btn) {
+    btn.textContent = order === "desc" ? "⬆️" : "⬇️";
+  }
+}
+
+function toggleEpisodeOrder(){
+  const cur = localStorage.getItem("episodeOrder") || "asc";
+  localStorage.setItem("episodeOrder", cur === "asc" ? "desc" : "asc");
+  applyEpisodeOrder();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const btn = document.getElementById("order-toggle");
+  if (btn) {
+    btn.addEventListener("click", toggleEpisodeOrder);
+    applyEpisodeOrder();
+  }
+});
 
 /* =========================
    SCAN STATUS + TRIGGER
