@@ -78,6 +78,7 @@ class Title(db.Model):
 
 class Episode(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    added = db.Column(db.DateTime, default=datetime.utcnow)
     title_id = db.Column(db.Integer, db.ForeignKey('title.id'))
     name = db.Column(db.String(255))
     number = db.Column(db.Integer)
@@ -95,11 +96,12 @@ class EpisodeImage(db.Model):
     available = db.Column(db.Boolean, default=True)
 
 class UserEpisode(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"))
+    #id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), primary_key=True)
+    title_id = db.Column(db.Integer, db.ForeignKey("title.id"), primary_key=True)
     episode_id = db.Column(db.Integer, db.ForeignKey("episode.id"))
-    read = db.Column(db.Boolean, default=False)
     scroll = db.Column(db.Integer, default=0)
+    read = db.Column(db.Boolean, default=False)
     updated = db.Column(db.DateTime, default=datetime.utcnow)
 
 @login_manager.user_loader
@@ -493,8 +495,8 @@ def episode(eid):
     title = db.session.get(Title, epi.title_id)
     imgs = EpisodeImage.query.filter_by(episode_id=eid).order_by(EpisodeImage.index).all()
 
-    ue = UserEpisode.query.filter_by(user_id=current_user.id, episode_id=eid).first()
-    scroll = ue.scroll if ue else 0
+    ue = UserEpisode.query.filter_by(user_id=current_user.id, title_id=epi.title_id).first()
+    scroll = ue.scroll if ue and ue.episode_id == eid else 0
 
     next_epi = Episode.query.filter(Episode.title_id==epi.title_id, Episode.number>epi.number).order_by(Episode.number).first()
     prev_epi = Episode.query.filter(Episode.title_id==epi.title_id, Episode.number<epi.number).order_by(Episode.number.desc()).first()
@@ -507,13 +509,14 @@ def progress():
     eid = int(request.form["episode"])
     img_index = int(request.form["index"])
 
+    ep = Episode.query.filter(Episode.id==eid).first()
     ue = UserEpisode.query.filter_by(
         user_id=current_user.id,
-        episode_id=eid
+        title_id=ep.title_id
     ).first()
 
     if not ue:
-        ue = UserEpisode(user_id=current_user.id, episode_id=eid)
+        ue = UserEpisode(user_id=current_user.id, title_id=ep.title_id, episode_id=eid)
         db.session.add(ue)
 
     ue.scroll = img_index          # now means image index
