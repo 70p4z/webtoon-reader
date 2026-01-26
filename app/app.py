@@ -485,8 +485,14 @@ def home():
 def title_view(tid):
     title = Title.query.get_or_404(tid)
     episodes = Episode.query.filter_by(title_id=tid).order_by(Episode.number).all()
-    bookmarks = { ue.episode_id: ue for ue in UserEpisode.query.filter_by(user_id=current_user.id).all()}
-    return render_template("episodes.html", title=title, episodes=episodes, bookmarks=bookmarks)
+    #bookmarks = { ue.episode_id: ue for ue in UserEpisode.query.filter_by(user_id=current_user.id).all()}
+    bookmark = UserEpisode.query.filter_by(
+        user_id=current_user.id,
+        title_id=tid
+    ).first()
+    if bookmark:
+        bookmarked_episode = Episode.query.get_or_404(bookmark.episode_id)
+    return render_template("episodes.html", title=title, episodes=episodes, bookmark=bookmark, bookmarked_episode=bookmarked_episode)
 
 @app.route("/episode/<int:eid>")
 @login_required
@@ -510,19 +516,18 @@ def progress():
     img_index = int(request.form["index"])
 
     ep = Episode.query.filter(Episode.id==eid).first()
-    ue = UserEpisode.query.filter_by(
+    ues = UserEpisode.query.filter_by(
         user_id=current_user.id,
-        title_id=ep.title_id
-    ).first()
+        title_id=ep.title_id)
+    ue = ues.first()
 
-    if not ue:
-        ue = UserEpisode(user_id=current_user.id, title_id=ep.title_id, episode_id=eid)
-        db.session.add(ue)
-
-    ue.scroll = img_index          # now means image index
-    ue.read = img_index > 0        # “started reading”
+    if ue:
+        ues.delete()
+    ue = UserEpisode(user_id=current_user.id, title_id=ep.title_id, episode_id=eid)
+    ue.scroll = img_index
+    ue.read = img_index > 0
     ue.updated = datetime.utcnow()
-
+    db.session.add(ue)
     db.session.commit()
     return "ok"
 

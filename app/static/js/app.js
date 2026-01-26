@@ -37,7 +37,7 @@ function applyEpisodeOrder(){
 
   const order = localStorage.getItem("episodeOrder") || "asc";
 
-  const cards = Array.from(document.getElementsByClassName("episode-card"));
+  const cards = Array.from(list.getElementsByClassName("episode-card"));
 
   cards.sort((a, b) => {
     const na = parseInt(a.dataset.epNumber || 0);
