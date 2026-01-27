@@ -490,6 +490,7 @@ def title_view(tid):
         user_id=current_user.id,
         title_id=tid
     ).first()
+    bookmarked_episode=None
     if bookmark:
         bookmarked_episode = Episode.query.get_or_404(bookmark.episode_id)
     return render_template("episodes.html", title=title, episodes=episodes, bookmark=bookmark, bookmarked_episode=bookmarked_episode)
@@ -515,20 +516,22 @@ def progress():
     eid = int(request.form["episode"])
     img_index = int(request.form["index"])
 
-    ep = Episode.query.filter(Episode.id==eid).first()
-    ues = UserEpisode.query.filter_by(
-        user_id=current_user.id,
-        title_id=ep.title_id)
-    ue = ues.first()
+    # only update progress when not clicking randomly on a chapter
+    if img_index > 0:
+        ep = Episode.query.filter(Episode.id==eid).first()
+        ues = UserEpisode.query.filter_by(
+            user_id=current_user.id,
+            title_id=ep.title_id)
+        ue = ues.first()
 
-    if ue:
-        ues.delete()
-    ue = UserEpisode(user_id=current_user.id, title_id=ep.title_id, episode_id=eid)
-    ue.scroll = img_index
-    ue.read = img_index > 0
-    ue.updated = datetime.utcnow()
-    db.session.add(ue)
-    db.session.commit()
+        if ue:
+            ues.delete()
+        ue = UserEpisode(user_id=current_user.id, title_id=ep.title_id, episode_id=eid)
+        ue.scroll = img_index
+        ue.read = img_index > 0
+        ue.updated = datetime.utcnow()
+        db.session.add(ue)
+        db.session.commit()
     return "ok"
 
 
