@@ -23,6 +23,9 @@
             <div class="episode-name">
                 {{ bookmarked_episode.name }}
             </div>
+            <div class="episode-date">
+                {{ bookmarked_episode.added|humanize_naturaldate }}
+            </div>
         </div>
     </a>
 </div>
@@ -46,6 +49,9 @@
         </div>
         <div class="episode-name">
             {{ e.name }}
+        </div>
+        <div class="episode-date">
+            {{ e.added|humanize_naturaldate }}
         </div>
 
     </div>

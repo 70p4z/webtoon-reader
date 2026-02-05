@@ -8,4 +8,33 @@
 <a class='title-card' href='{{ url_for("title_view", tid=t.id) }}'>{{t.name}}</a>
 {% endfor %}
 </div>
+
+<h2>Latest chapters</h2>
+<div class='episodes' id="episode-latest">
+{% for et in latests %}
+<a class="episode-card
+" href="{{ url_for('episode', eid=et[0].id) }}" data-ep-number="{{ et[0].number }}">
+
+    {% if et[0].thumb %}
+        <img class="episode-thumb"
+             src="{{ url_for('media', eid=et[0].id, fname=et[0].thumb) }}"
+             alt="thumb">
+    {% endif %}
+
+    <div class="episode-info">
+        <div class="episode-title">
+            {{ et[1].name }} {{ et[0].number }}
+        </div>
+        <div class="episode-name">
+            {{ et[0].name }}
+        </div>
+        <div class="episode-date">
+        	{{ et[0].added|humanize_naturaldate }}
+        </div>
+
+    </div>
+
+</a>
+{% endfor %}
+
 {% endblock %}

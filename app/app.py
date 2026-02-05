@@ -13,16 +13,18 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func
 from io import BytesIO
 import mimetypes
 import zipfile
 import rarfile
-
+from jinja2 import Template, Environment
+import jinja2_humanize_extension
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "supersecret")
 
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.INFO)
 logging.getLogger('werkzeug').setLevel(logging.ERROR)
 
 DB_PATH = os.path.join(os.getcwd(), "db/webtoon.db")
@@ -32,6 +34,9 @@ os.system(f"touch {DB_PATH}")
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + DB_PATH
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
+
+# We load the extension in a jinja2 Environment
+app.jinja_env.add_extension('jinja2_humanize_extension.HumanizeExtension')
 
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
@@ -472,13 +477,23 @@ def home():
     #titles = Title.query.all()
     titles = (
         db.session.query(Title)
-        .join(Episode)
+        .join(Episode) 
         .join(EpisodeImage)
         .distinct()
         .order_by(Title.name)
         .all()
     )
-    return render_template("home.html", titles=titles)
+    latests = (
+        db.session.query(Episode, Title, func.max(Episode.added))
+        .join(Title)
+        .join(EpisodeImage)
+        .distinct()
+        .group_by(Title.id)
+        .order_by(Episode.added.desc())
+        .limit(50)
+        .all()
+    )
+    return render_template("home.html", titles=titles, latests=latests)
 
 @app.route("/title/<int:tid>")
 @login_required

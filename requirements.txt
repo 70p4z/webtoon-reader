@@ -5,3 +5,5 @@ SQLAlchemy>=2.0.30
 typing_extensions>=4.12
 werkzeug>=3.0
 rarfile
+humanize
+jinja2-humanize-extension
