@@ -2,6 +2,7 @@
 version: '3'
 services:
   webtoon:
+    restart: always
     build: .
     ports:
       - "6080:5000"
