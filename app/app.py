@@ -550,7 +550,7 @@ def progress():
     return "ok"
 
 
-from flask import send_file
+from flask import send_file, abort
 
 @app.route("/media/<int:eid>/<path:fname>")
 @login_required
